@@ -4,12 +4,7 @@ import os
 import re
 
 # ==========================================
-# 0. 多語言配置 & 列名翻譯字典 (含簡繁區分)
-# ==========================================
-st.set_page_config(page_title="Torist Bird Index", layout="wide", page_icon="🐦")
-
-# ==========================================
-# 0. 多語言配置 & 列名翻譯字典 (已更新：區分簡繁)
+# 0. 多語言配置 & 列名翻譯字典
 # ==========================================
 st.set_page_config(page_title="Torist Bird Index", layout="wide", page_icon="🐦")
 
@@ -72,71 +67,19 @@ TRANSLATIONS = {
     }
 }
 
-# 核心：列名翻譯 (新增：不同視角下的名稱映射)
-COLUMN_MAP = {
-    "SC": { # 簡體視角
-        "Index": "编号", "学名": "学名", "Scientific": "学名",
-        "中文名": "中文名", "Chinese": "中文名", # 自己的語言
-        "中文名_TW": "中文名(台)", "Chinese (Traditional)": "中文名(繁)", # 別人的語言
-        "English": "英文名", "English_IOC": "英文名(IOC)",
-        "Japanese": "日文名", "和名": "日文名",
-        "Family": "科名", "科名": "科名"
-    },
-    "TC": { # 繁體視角
-        "Index": "編號", "学名": "學名", "Scientific": "學名",
-        "中文名_TW": "中文名", "Chinese (Traditional)": "中文名", # 自己的語言
-        "中文名": "中文名(簡)", "Chinese": "中文名(簡)", # 別人的語言
-        "English": "英文名", "English_IOC": "英文名(IOC)",
-        "Japanese": "日文名", "和名": "日文名",
-        "Family": "科名", "科名": "科名"
-    },
-    "EN": {
-        "Index": "#", "学名": "Sci-Name", 
-        "中文名": "Chinese(S)", "中文名_TW": "Chinese(T)",
-        "Chinese": "Chinese(S)", "Chinese (Traditional)": "Chinese(T)",
-        "English": "English", "English_IOC": "English(IOC)",
-        "Japanese": "Japanese", "和名": "Japanese",
-        "Family": "Family", "科名": "Family"
-    },
-    "JP": {
-        "Index": "No.", "学名": "学名", 
-        "中文名": "中国語(簡)", "中文名_TW": "中国語(繁)",
-        "Chinese": "中国語(簡)", "Chinese (Traditional)": "中国語(繁)",
-        "English": "英語", "English_IOC": "英語(IOC)",
-        "Japanese": "和名", "和名": "和名",
-        "Family": "科", "科名": "科"
-    }
-}
-
-# 列排序優先級 (新增：簡繁優先順序不同)
-def get_column_priority(lang_code):
-    base = ['Index', '学名', 'Link_Key']
-    if lang_code == 'SC':
-        # 簡體優先
-        return base + ['中文名', 'Chinese', '中文名_TW', 'Chinese (Traditional)', 'English', 'Japanese', 'Family', '科名']
-    elif lang_code == 'TC':
-        # 繁體優先
-        return base + ['中文名_TW', 'Chinese (Traditional)', '中文名', 'Chinese', 'English', 'Japanese', 'Family', '科名']
-    elif lang_code == 'JP':
-        return base + ['Japanese', '和名', 'English', '中文名', '中文名_TW', 'Family', '科名']
-    else: # EN
-        return base + ['English', 'English_IOC', 'Chinese (Traditional)', 'Chinese', 'Japanese', 'Family']
-
-# 核心：列名翻譯 (區分簡繁)
-# 這裡定義了 raw data 的列名 -> 界面顯示的列名
 COLUMN_MAP = {
     "SC": { # 简体视角
         "Index": "编号", "学名": "学名", "Scientific": "学名",
-        "中文名": "中文名", "Chinese": "中文名", # 自己的语言
-        "中文名_TW": "中文名(台)", "Chinese (Traditional)": "中文名(繁)", # 别人的语言
+        "中文名": "中文名", "Chinese": "中文名",
+        "中文名_TW": "中文名(台)", "Chinese (Traditional)": "中文名(繁)",
         "English": "英文名", "English_IOC": "英文名(IOC)",
         "Japanese": "日文名", "和名": "日文名",
         "Family": "科名", "科名": "科名"
     },
     "TC": { # 繁体视角
         "Index": "編號", "学名": "學名", "Scientific": "學名",
-        "中文名_TW": "中文名", "Chinese (Traditional)": "中文名", # 自己的语言
-        "中文名": "中文名(簡)", "Chinese": "中文名(簡)", # 别人的语言
+        "中文名_TW": "中文名", "Chinese (Traditional)": "中文名",
+        "中文名": "中文名(簡)", "Chinese": "中文名(簡)",
         "English": "英文名", "English_IOC": "英文名(IOC)",
         "Japanese": "日文名", "和名": "日文名",
         "Family": "科名", "科名": "科名"
@@ -159,7 +102,7 @@ COLUMN_MAP = {
     }
 }
 
-# 列排序優先級 (根據語言習慣調整)
+# 列排序優先級 
 def get_column_priority(lang_code):
     base = ['Index', '学名', 'Link_Key']
     if lang_code == 'SC':
@@ -188,9 +131,7 @@ def translate_columns(df, lang_code):
     return df.rename(columns=new_cols)
 
 # ==========================================
-# 1. 智能文件讀取與清洗
-# ==========================================
-# 1. 智能文件讀取與清洗
+# 1. 文件讀取與清洗
 # ==========================================
 def read_excel_smart(filepath, sheet_keywords, header_hints):
     try:
@@ -218,18 +159,17 @@ def read_excel_smart(filepath, sheet_keywords, header_hints):
         print(f"Error reading {filepath}: {e}")
         return None
 
-# --- 升級後的版本提取函數 ---
+# --- 版本提取函數 ---
 def extract_version(filename):
     """
     智能提取版本號，支持多種格式
     """
-    # 1. 優先匹配 "7ed", "8ed" 這種明確的版次 (日本名錄常用)
+    # 1. 優先匹配 "7ed", "8ed" 
     match = re.search(r'(\d+)ed', filename, re.IGNORECASE)
     if match:
         return f"{match.group(1)}th"
 
-    # 2. 匹配 "JP 7", "JP 8", "ver 7", "v7" 這種格式
-    # 邏輯：JP/ver/v 後面跟著數字，且數字後面沒有其他數字了
+    # 2. 匹配 "JP 7", "JP 8", "ver 7", "v7"
     match = re.search(r'(?:JP|ver|v)[ ._-]?(\d+)(?!\d)', filename, re.IGNORECASE)
     if match:
         return f"v{match.group(1)}"
@@ -280,7 +220,6 @@ def load_data():
                     df['学名'] = df['学名'].str.strip()
                     df['Index'] = df['Index'].apply(clean_index)
                     
-                    # === 改動點：這裡加上了 CBR 字樣 ===
                     key = f"China CBR ({version})" 
                     data_store[key] = df
 
@@ -317,15 +256,11 @@ def load_data():
         # 3. Japan (OSJ)
         elif "jp" in f.lower() or "osj" in f.lower():
             # === 專門處理第 7 版 (舊格式 .xls) ===
-            # v7 特徵：文件名含 7ed，內容無表頭，學名分兩列
             if "7ed" in f or "v7" in version:
                 try:
-                    # 1. 強制用 xlrd 讀取，且不設表頭 (header=None)，這樣我們可以用數字索引列
                     df = pd.read_excel(f_path, header=None, engine='xlrd')
                     
-                    # 2. 篩選：第1列是等級，我們只要 "種" (Species)
-                    # v7 結構通常是: [No, Rank, ID, Genus, Species, Auth, JapName...]
-                    # 索引:           0    1    2     3       4       5       6
+                    # 2.  "種" (Species)
                     if 1 in df.columns:
                         df = df[df[1] == '種']
                     
@@ -333,7 +268,7 @@ def load_data():
                     if 3 in df.columns and 4 in df.columns:
                         df['学名'] = df[3].astype(str) + " " + df[4].astype(str)
                         
-                    # 4. 提取日文名 (通常在第 6 列，有時候在第 7 列，保險起見試一下)
+                    # 4. 提取日文名 
                     if 6 in df.columns:
                         df['Japanese'] = df[6]
                     
@@ -353,7 +288,7 @@ def load_data():
                 except Exception as e:
                     print(f"Error reading Japan v7: {e}")
 
-            # === 處理第 8 版 (v8) 及標準格式 (保持不變) ===
+            # === 處理第 8 版 (v8) 及標準格式 ===
             else:
                 df = read_excel_smart(f_path, ["リスト", "List"], ['学名', 'Scientific'])
                 if df is not None:
@@ -392,7 +327,6 @@ def load_data():
                     
                     df = df.rename(columns=cols_map)
                     
-                    # === 這裡增加了 Chinese (Traditional) ===
                     keep_cols = ['学名', 'English_IOC', 'Chinese', 'Chinese (Traditional)', 'Japanese', 'Family']
                     
                     if 'Index' in df.columns: keep_cols.insert(0, 'Index')
@@ -410,10 +344,8 @@ def load_data():
 # 3. 界面邏輯
 # ==========================================
 with st.sidebar:
-    # 這裡增加了 "简体中文" 和 "繁體中文" 的選項
     lang_opt = st.radio("Language / 言語", ["简体中文", "繁體中文", "English", "日本語"], horizontal=True)
     
-    # 邏輯映射
     if lang_opt == "简体中文": lang_code = "SC"
     elif lang_opt == "繁體中文": lang_code = "TC"
     elif lang_opt == "English": lang_code = "EN"
