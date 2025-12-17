@@ -258,10 +258,13 @@ def load_data():
     base_dir = "original_index"
     syn_dict = {}
 
+    print("🚀 开始加载数据...")
+
     if not os.path.exists(base_dir): return {}, {}, "Folder Missing"
     files = [f for f in os.listdir(base_dir) if f.endswith(('.xlsx', '.xls'))]
     
     for f in files:
+        print(f"🔍 正在加载文件: {f}")
         f_path = os.path.join(base_dir, f)
         version = extract_version(f)
         
@@ -400,6 +403,7 @@ def load_data():
                     if 'Index' in df.columns: df['Index'] = df['Index'].apply(clean_index)
                     data_store[f"IOC ({version})"] = df
 
+    print("🚀 数据加载完成！")
     return data_store, syn_dict, "Success"
 
 # ==========================================
