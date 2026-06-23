@@ -159,54 +159,64 @@ COLUMN_MAP = {
     }
 }
 
-# 列所屬語言分組（用於字段篩選）
-LANG_COLUMN_GROUPS = {
-    'Index': 'index',
-    '学名': 'sci',
-    '中文名': 'sc', 'Chinese': 'sc',
-    '中文名_TW': 'tc', 'Chinese (Traditional)': 'tc',
-    'English': 'en', 'English_IOC': 'en', '英文名': 'en',
-    'Japanese': 'jp', '和名': 'jp',
-    'Family': 'family', '科名': 'family',
-}
+# 始終顯示的列（不參與篩選）
+ALWAYS_SHOW_COLS = {'Index', '学名'}
 
-# 各 UI 語言下語言分組的顯示標籤
-LANG_GROUP_LABELS = {
-    'SC': {'index': '#', 'sci': '学名', 'sc': '简中', 'tc': '繁中', 'en': '英文', 'jp': '日文', 'family': '科名'},
-    'TC': {'index': '#', 'sci': '學名', 'sc': '簡中', 'tc': '繁中', 'en': '英文', 'jp': '日文', 'family': '科名'},
-    'EN': {'index': '#', 'sci': 'Sci', 'sc': 'Zh-S', 'tc': 'Zh-T', 'en': 'EN', 'jp': 'JP', 'family': 'Family'},
-    'JP': {'index': '#', 'sci': '学名', 'sc': '簡中', 'tc': '繁中', 'en': '英語', 'jp': '和名', 'family': '科'},
-}
+def get_col_label(col, lang_code):
+    """將原始列名翻譯為當前 UI 語言的顯示標籤"""
+    return COLUMN_MAP.get(lang_code, {}).get(col, col)
 
-def detect_lang_groups(df_cols):
-    """按列出現順序返回該數據集擁有的語言分組列表（去重）"""
-    seen, groups = set(), []
-    for col in df_cols:
-        grp = LANG_COLUMN_GROUPS.get(col.split(' [')[0])
-        if grp and grp not in seen:
-            groups.append(grp)
-            seen.add(grp)
-    return groups
-
-def filter_cols_by_groups(cols, selected_base_groups, selected_compare_groups):
-    """根據所選語言分組過濾列名列表"""
+def filter_cols_by_selection(cols, selected_base_cols, selected_compare_cols):
+    """根據所選列名集合過濾列表"""
     keep = []
-    fixed = {'index', 'sci'}
     for col in cols:
         if col == 'Link_Key':
             continue
         if '[' in col and col.endswith(']'):
-            base_col = col.split(' [')[0]
-            dataset = col[col.index('[') + 1:-1]
-            grp = LANG_COLUMN_GROUPS.get(base_col)
-            sel = selected_compare_groups.get(dataset, fixed)
-            if grp is None or grp in sel:
+            base_col = col[:col.rindex(' [')]
+            dataset = col[col.rindex('[') + 1:-1]
+            sel = selected_compare_cols.get(dataset)
+            if sel is None or base_col in sel:
                 keep.append(col)
         else:
-            grp = LANG_COLUMN_GROUPS.get(col)
-            if grp is None or grp in selected_base_groups:
+            if col in ALWAYS_SHOW_COLS or col in selected_base_cols:
                 keep.append(col)
     return keep
+
+def build_col_selector(caption, df_cols, lang_code, widget_key):
+    """
+    渲染字段選擇器，返回所選原始列名集合。
+    列數 <= 6 時用 pills；> 6 時用可搜索的 multiselect（支持拼音/字母定位）。
+    """
+    selectable = [c for c in df_cols if c not in ALWAYS_SHOW_COLS]
+    if not selectable:
+        return set(df_cols)
+
+    # 構建標籤 → 原始列名映射（多列可共用一個翻譯標籤）
+    label_to_cols: dict[str, list[str]] = {}
+    for c in selectable:
+        lbl = get_col_label(c, lang_code)
+        label_to_cols.setdefault(lbl, []).append(c)
+    unique_labels = list(label_to_cols.keys())
+
+    st.caption(f"▸ {caption}")
+    if len(unique_labels) > 6:
+        sel = st.multiselect(
+            caption, unique_labels, default=unique_labels,
+            label_visibility="collapsed", key=widget_key,
+        )
+    else:
+        sel = st.pills(
+            caption, unique_labels, default=unique_labels,
+            selection_mode="multi", label_visibility="collapsed",
+            key=widget_key,
+        )
+
+    selected = set()
+    for lbl in sel:
+        for c in label_to_cols[lbl]:
+            selected.add(c)
+    return selected
 
 # 列排序優先級
 def get_column_priority(lang_code):
@@ -430,17 +440,22 @@ def load_data():
                 if ioc_sci_col:
                     cols_map = {ioc_sci_col: '学名', 'English': 'English_IOC'}
                     if idx_col: cols_map[idx_col] = 'Index'
-                    
                     df = df.rename(columns=cols_map)
-                    
-                    keep_cols = ['学名', 'English_IOC', 'Chinese', 'Chinese (Traditional)', 'Japanese', 'Family']
-                    
-                    if 'Index' in df.columns: keep_cols.insert(0, 'Index')
-                    keep_cols = [c for c in keep_cols if c in df.columns]
-                    
-                    df = df[keep_cols]
+
+                    # 丟棄結構性列（IOC Order/Rank/Unnamed/純空列）
+                    structural = {'IOC_order', 'IOC order', 'Order', 'Rank'}
+                    keep_cols = [
+                        c for c in df.columns
+                        if str(c).strip()
+                        and not str(c).startswith('Unnamed')
+                        and c not in structural
+                    ]
+                    if 'Index' in df.columns and 'Index' not in keep_cols:
+                        keep_cols.insert(0, 'Index')
+                    df = df[keep_cols].dropna(subset=['学名'])
                     df['学名'] = df['学名'].str.strip()
-                    if 'Index' in df.columns: df['Index'] = df['Index'].apply(clean_index)
+                    if 'Index' in df.columns:
+                        df['Index'] = df['Index'].apply(clean_index)
                     data_store[f"IOC ({version})"] = df
 
     print("🚀 数据加载完成！")
@@ -490,40 +505,15 @@ with st.sidebar:
     # 字段篩選（語言列選擇）
     st.markdown("---")
     st.caption(txt["col_filter"])
-    group_labels = LANG_GROUP_LABELS[lang_code]
-    fixed_groups = {'index', 'sci'}
 
-    base_avail = detect_lang_groups(data_dict[base_list].columns)
-    base_selectable = [g for g in base_avail if g not in fixed_groups]
-    if base_selectable:
-        st.caption(f"▸ {base_list}")
-        base_sel = st.pills(
-            "base_fields",
-            options=[group_labels[g] for g in base_selectable],
-            default=[group_labels[g] for g in base_selectable],
-            selection_mode="multi",
-            label_visibility="collapsed",
-        )
-        selected_base_groups = fixed_groups | {g for g in base_selectable if group_labels[g] in base_sel}
-    else:
-        selected_base_groups = fixed_groups | set(base_avail)
-
-    selected_compare_groups = {}
+    selected_base_cols = build_col_selector(
+        base_list, list(data_dict[base_list].columns), lang_code, "base_fields"
+    )
+    selected_compare_cols = {}
     for cname in compare_lists:
-        cmp_avail = detect_lang_groups(data_dict[cname].columns)
-        cmp_selectable = [g for g in cmp_avail if g not in fixed_groups]
-        if cmp_selectable:
-            st.caption(f"▸ {cname}")
-            cmp_sel = st.pills(
-                f"cmp_{cname}",
-                options=[group_labels[g] for g in cmp_selectable],
-                default=[group_labels[g] for g in cmp_selectable],
-                selection_mode="multi",
-                label_visibility="collapsed",
-            )
-            selected_compare_groups[cname] = fixed_groups | {g for g in cmp_selectable if group_labels[g] in cmp_sel}
-        else:
-            selected_compare_groups[cname] = fixed_groups | set(cmp_avail)
+        selected_compare_cols[cname] = build_col_selector(
+            cname, list(data_dict[cname].columns), lang_code, f"cmp_{cname}"
+        )
 
 # ==========================================
 # 4. 核心合併
@@ -584,7 +574,7 @@ for p_col in priority_basic_cols:
 for c in all_cols:
     if c not in final_col_order: final_col_order.append(c)
 
-filtered_col_order = filter_cols_by_groups(final_col_order, selected_base_groups, selected_compare_groups)
+filtered_col_order = filter_cols_by_selection(final_col_order, selected_base_cols, selected_compare_cols)
 main_df = main_df[filtered_col_order]
 display_df = translate_columns(main_df, lang_code)
 
