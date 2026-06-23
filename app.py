@@ -200,17 +200,10 @@ def build_col_selector(caption, df_cols, lang_code, widget_key):
     unique_labels = list(label_to_cols.keys())
 
     st.caption(f"▸ {caption}")
-    if len(unique_labels) > 6:
-        sel = st.multiselect(
-            caption, unique_labels, default=unique_labels,
-            label_visibility="collapsed", key=widget_key,
-        )
-    else:
-        sel = st.pills(
-            caption, unique_labels, default=unique_labels,
-            selection_mode="multi", label_visibility="collapsed",
-            key=widget_key,
-        )
+    sel = st.multiselect(
+        caption, unique_labels, default=unique_labels,
+        label_visibility="collapsed", key=widget_key,
+    )
 
     selected = set()
     for lbl in sel:
