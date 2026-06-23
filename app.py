@@ -633,6 +633,10 @@ fuzzy_threshold = 70
 if mode == "fuzzy":
     fuzzy_threshold = st.slider(txt["fuzzy_threshold"], min_value=50, max_value=100, value=70, step=5)
 
+# 編號列窄寬配置
+index_label = get_col_label('Index', lang_code)
+col_cfg = {index_label: st.column_config.TextColumn(width="small")} if index_label in display_df.columns else {}
+
 # 搜索邏輯
 if query:
     search_cols = get_scope_cols(scope, main_df, display_df, lang_code)
@@ -665,7 +669,7 @@ if query:
             file_name="torist_search.csv",
             mime="text/csv",
         )
-    st.dataframe(res, use_container_width=True, hide_index=True)
+    st.dataframe(res, use_container_width=True, hide_index=True, column_config=col_cfg)
 else:
     col_info, col_export = st.columns([3, 1])
     with col_info:
@@ -677,4 +681,4 @@ else:
             file_name="torist_full.csv",
             mime="text/csv",
         )
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    st.dataframe(display_df, use_container_width=True, hide_index=True, column_config=col_cfg)
