@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import re
+from rapidfuzz import fuzz
 
 # ==========================================
 # 0. 多語言配置 & 列名翻譯字典
@@ -21,7 +22,20 @@ TRANSLATIONS = {
         "col_view": "📋 {name}",
         "synonym_loaded": "🔗 同义词库: {count} 条规则",
         "no_data": "⚠️ 未检测到有效名录，请检查 original_index 文件夹",
-        "folder_missing": "❌ 文件夹不存在"
+        "folder_missing": "❌ 文件夹不存在",
+        "search_scope": "搜索范围",
+        "scope_all": "全部字段",
+        "scope_sci": "学名",
+        "scope_cn": "中文名",
+        "scope_en": "英文名",
+        "search_mode": "匹配方式",
+        "mode_contains": "包含",
+        "mode_startswith": "开头匹配",
+        "mode_fuzzy": "模糊匹配",
+        "fuzzy_threshold": "匹配阈值",
+        "export_btn": "导出 CSV",
+        "export_all": "导出全部数据",
+        "showing_all": "共 {count} 条记录"
     },
     "TC": { # 繁體中文
         "title": "Torist 🐦 多語言鳥類索引",
@@ -35,7 +49,20 @@ TRANSLATIONS = {
         "col_view": "📋 {name}",
         "synonym_loaded": "🔗 同義詞庫: {count} 條規則",
         "no_data": "⚠️ 未檢測到有效名錄，請檢查 original_index 文件夾",
-        "folder_missing": "❌ 文件夾不存在"
+        "folder_missing": "❌ 文件夾不存在",
+        "search_scope": "搜尋範圍",
+        "scope_all": "全部欄位",
+        "scope_sci": "學名",
+        "scope_cn": "中文名",
+        "scope_en": "英文名",
+        "search_mode": "比對方式",
+        "mode_contains": "包含",
+        "mode_startswith": "開頭比對",
+        "mode_fuzzy": "模糊比對",
+        "fuzzy_threshold": "比對閾值",
+        "export_btn": "匯出 CSV",
+        "export_all": "匯出全部資料",
+        "showing_all": "共 {count} 筆記錄"
     },
     "EN": {
         "title": "Torist 🐦 Smart Wild Bird Index",
@@ -49,7 +76,20 @@ TRANSLATIONS = {
         "col_view": "📋 View: {name}",
         "synonym_loaded": "🔗 Synonyms: {count} rules",
         "no_data": "⚠️ No valid checklists found.",
-        "folder_missing": "❌ Folder missing"
+        "folder_missing": "❌ Folder missing",
+        "search_scope": "Search Scope",
+        "scope_all": "All Fields",
+        "scope_sci": "Scientific Name",
+        "scope_cn": "Chinese Name",
+        "scope_en": "English Name",
+        "search_mode": "Match Mode",
+        "mode_contains": "Contains",
+        "mode_startswith": "Starts With",
+        "mode_fuzzy": "Fuzzy Match",
+        "fuzzy_threshold": "Threshold",
+        "export_btn": "Export CSV",
+        "export_all": "Export All Data",
+        "showing_all": "{count} records total"
     },
     "JP": {
         "title": "Torist 🐦 多語言野鳥名錄",
@@ -63,7 +103,20 @@ TRANSLATIONS = {
         "col_view": "📋 {name} ビュー",
         "synonym_loaded": "🔗 シノニム: {count} 件",
         "no_data": "⚠️ データなし。フォルダを確認してください。",
-        "folder_missing": "❌ フォルダが見つかりません"
+        "folder_missing": "❌ フォルダが見つかりません",
+        "search_scope": "検索範囲",
+        "scope_all": "全フィールド",
+        "scope_sci": "学名",
+        "scope_cn": "中国語名",
+        "scope_en": "英語名",
+        "search_mode": "マッチ方式",
+        "mode_contains": "含む",
+        "mode_startswith": "前方一致",
+        "mode_fuzzy": "あいまい検索",
+        "fuzzy_threshold": "閾値",
+        "export_btn": "CSV 出力",
+        "export_all": "全データ出力",
+        "showing_all": "全 {count} 件"
     }
 }
 
@@ -423,12 +476,8 @@ for target_name in compare_lists:
 # ==========================================
 # 5. 顯示優化
 # ==========================================
-st.subheader(txt["col_view"].format(name=base_list))
-col1, col2 = st.columns([3, 1])
-with col1:
-    query = st.text_input(txt["search_label"], placeholder=txt["search_placeholder"])
 
-# 排序
+# 列排序
 all_cols = list(main_df.columns)
 priority_basic_cols = get_column_priority(lang_code)
 final_col_order = []
@@ -447,10 +496,97 @@ for c in all_cols:
 main_df = main_df[final_col_order]
 display_df = translate_columns(main_df, lang_code)
 
+# 推斷各字段對應的 display_df 列名（翻譯後）
+def get_scope_cols(scope, main_df, display_df, lang_code):
+    """根據搜索範圍返回 display_df 中對應的列名列表"""
+    if scope == "all":
+        return list(display_df.columns)
+
+    sci_raw = ['学名']
+    cn_raw = ['中文名', '中文名_TW', 'Chinese', 'Chinese (Traditional)']
+    en_raw = ['English', 'English_IOC', '英文名']
+
+    raw_map = {"sci": sci_raw, "cn": cn_raw, "en": en_raw}
+    target_raws = raw_map.get(scope, [])
+
+    col_rename = {}
+    for orig, renamed in zip(main_df.columns, display_df.columns):
+        base = orig.split(" [")[0]
+        if base in target_raws:
+            col_rename[orig] = renamed
+
+    return list(col_rename.values()) if col_rename else list(display_df.columns)
+
+st.subheader(txt["col_view"].format(name=base_list))
+
+# 搜索控件行
+c1, c2, c3 = st.columns([4, 2, 2])
+with c1:
+    query = st.text_input(txt["search_label"], placeholder=txt["search_placeholder"], label_visibility="collapsed")
+with c2:
+    scope_options = {
+        txt["scope_all"]: "all",
+        txt["scope_sci"]: "sci",
+        txt["scope_cn"]: "cn",
+        txt["scope_en"]: "en",
+    }
+    scope_label = st.selectbox(txt["search_scope"], list(scope_options.keys()), label_visibility="collapsed")
+    scope = scope_options[scope_label]
+with c3:
+    mode_options = {
+        txt["mode_contains"]: "contains",
+        txt["mode_startswith"]: "startswith",
+        txt["mode_fuzzy"]: "fuzzy",
+    }
+    mode_label = st.selectbox(txt["search_mode"], list(mode_options.keys()), label_visibility="collapsed")
+    mode = mode_options[mode_label]
+
+fuzzy_threshold = 70
+if mode == "fuzzy":
+    fuzzy_threshold = st.slider(txt["fuzzy_threshold"], min_value=50, max_value=100, value=70, step=5)
+
+# 搜索邏輯
 if query:
-    mask = main_df.astype(str).apply(lambda x: x.str.lower().str.contains(query.lower())).any(axis=1)
+    search_cols = get_scope_cols(scope, main_df, display_df, lang_code)
+    q_lower = query.lower()
+
+    if mode == "startswith":
+        mask = display_df[search_cols].astype(str).apply(
+            lambda x: x.str.lower().str.startswith(q_lower)
+        ).any(axis=1)
+    elif mode == "fuzzy":
+        def row_fuzzy_match(row):
+            for val in row:
+                if fuzz.partial_ratio(q_lower, str(val).lower()) >= fuzzy_threshold:
+                    return True
+            return False
+        mask = display_df[search_cols].apply(row_fuzzy_match, axis=1)
+    else:
+        mask = display_df[search_cols].astype(str).apply(
+            lambda x: x.str.lower().str.contains(q_lower, regex=False)
+        ).any(axis=1)
+
     res = display_df[mask]
-    st.info(txt["found_res"].format(count=len(res)))
+    col_info, col_export = st.columns([3, 1])
+    with col_info:
+        st.info(txt["found_res"].format(count=len(res)))
+    with col_export:
+        st.download_button(
+            label=txt["export_btn"],
+            data=res.to_csv(index=False).encode("utf-8-sig"),
+            file_name="torist_search.csv",
+            mime="text/csv",
+        )
     st.dataframe(res, use_container_width=True, hide_index=True)
 else:
-    st.dataframe(display_df.head(200), use_container_width=True, hide_index=True)
+    col_info, col_export = st.columns([3, 1])
+    with col_info:
+        st.caption(txt["showing_all"].format(count=len(display_df)))
+    with col_export:
+        st.download_button(
+            label=txt["export_all"],
+            data=display_df.to_csv(index=False).encode("utf-8-sig"),
+            file_name="torist_full.csv",
+            mime="text/csv",
+        )
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
