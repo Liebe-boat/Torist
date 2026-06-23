@@ -9,6 +9,19 @@ from rapidfuzz import fuzz
 # ==========================================
 st.set_page_config(page_title="Torist Bird Index", layout="wide", page_icon="🐦")
 
+st.markdown("""
+<style>
+/* multiselect 已選標籤背景色 */
+span[data-baseweb="tag"] {
+    background-color: rgb(211, 186, 227) !important;
+}
+/* 標籤文字顏色（深色確保可讀） */
+span[data-baseweb="tag"] span {
+    color: #2d2d2d !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 TRANSLATIONS = {
     "SC": { # 簡體中文
         "title": "Torist 🐦 多语言鸟类索引",
