@@ -33,6 +33,7 @@ TRANSLATIONS = {
         "mode_startswith": "开头匹配",
         "mode_fuzzy": "模糊匹配",
         "fuzzy_threshold": "匹配阈值",
+        "col_filter": "字段筛选",
         "export_btn": "导出 CSV",
         "export_all": "导出全部数据",
         "showing_all": "共 {count} 条记录"
@@ -60,6 +61,7 @@ TRANSLATIONS = {
         "mode_startswith": "開頭比對",
         "mode_fuzzy": "模糊比對",
         "fuzzy_threshold": "比對閾值",
+        "col_filter": "欄位篩選",
         "export_btn": "匯出 CSV",
         "export_all": "匯出全部資料",
         "showing_all": "共 {count} 筆記錄"
@@ -87,6 +89,7 @@ TRANSLATIONS = {
         "mode_startswith": "Starts With",
         "mode_fuzzy": "Fuzzy Match",
         "fuzzy_threshold": "Threshold",
+        "col_filter": "Column Filter",
         "export_btn": "Export CSV",
         "export_all": "Export All Data",
         "showing_all": "{count} records total"
@@ -114,6 +117,7 @@ TRANSLATIONS = {
         "mode_startswith": "前方一致",
         "mode_fuzzy": "あいまい検索",
         "fuzzy_threshold": "閾値",
+        "col_filter": "フィールド絞込",
         "export_btn": "CSV 出力",
         "export_all": "全データ出力",
         "showing_all": "全 {count} 件"
@@ -155,7 +159,56 @@ COLUMN_MAP = {
     }
 }
 
-# 列排序優先級 
+# 列所屬語言分組（用於字段篩選）
+LANG_COLUMN_GROUPS = {
+    'Index': 'index',
+    '学名': 'sci',
+    '中文名': 'sc', 'Chinese': 'sc',
+    '中文名_TW': 'tc', 'Chinese (Traditional)': 'tc',
+    'English': 'en', 'English_IOC': 'en', '英文名': 'en',
+    'Japanese': 'jp', '和名': 'jp',
+    'Family': 'family', '科名': 'family',
+}
+
+# 各 UI 語言下語言分組的顯示標籤
+LANG_GROUP_LABELS = {
+    'SC': {'index': '#', 'sci': '学名', 'sc': '简中', 'tc': '繁中', 'en': '英文', 'jp': '日文', 'family': '科名'},
+    'TC': {'index': '#', 'sci': '學名', 'sc': '簡中', 'tc': '繁中', 'en': '英文', 'jp': '日文', 'family': '科名'},
+    'EN': {'index': '#', 'sci': 'Sci', 'sc': 'Zh-S', 'tc': 'Zh-T', 'en': 'EN', 'jp': 'JP', 'family': 'Family'},
+    'JP': {'index': '#', 'sci': '学名', 'sc': '簡中', 'tc': '繁中', 'en': '英語', 'jp': '和名', 'family': '科'},
+}
+
+def detect_lang_groups(df_cols):
+    """按列出現順序返回該數據集擁有的語言分組列表（去重）"""
+    seen, groups = set(), []
+    for col in df_cols:
+        grp = LANG_COLUMN_GROUPS.get(col.split(' [')[0])
+        if grp and grp not in seen:
+            groups.append(grp)
+            seen.add(grp)
+    return groups
+
+def filter_cols_by_groups(cols, selected_base_groups, selected_compare_groups):
+    """根據所選語言分組過濾列名列表"""
+    keep = []
+    fixed = {'index', 'sci'}
+    for col in cols:
+        if col == 'Link_Key':
+            continue
+        if '[' in col and col.endswith(']'):
+            base_col = col.split(' [')[0]
+            dataset = col[col.index('[') + 1:-1]
+            grp = LANG_COLUMN_GROUPS.get(base_col)
+            sel = selected_compare_groups.get(dataset, fixed)
+            if grp is None or grp in sel:
+                keep.append(col)
+        else:
+            grp = LANG_COLUMN_GROUPS.get(col)
+            if grp is None or grp in selected_base_groups:
+                keep.append(col)
+    return keep
+
+# 列排序優先級
 def get_column_priority(lang_code):
     base = ['Index', '学名', 'Link_Key']
     if lang_code == 'SC':
@@ -434,6 +487,44 @@ with st.sidebar:
     if ioc_versions: default_vals = [ioc_versions[-1]]
     compare_lists = st.multiselect(txt["cross_ref"], avail_opts, default=default_vals)
 
+    # 字段篩選（語言列選擇）
+    st.markdown("---")
+    st.caption(txt["col_filter"])
+    group_labels = LANG_GROUP_LABELS[lang_code]
+    fixed_groups = {'index', 'sci'}
+
+    base_avail = detect_lang_groups(data_dict[base_list].columns)
+    base_selectable = [g for g in base_avail if g not in fixed_groups]
+    if base_selectable:
+        st.caption(f"▸ {base_list}")
+        base_sel = st.pills(
+            "base_fields",
+            options=[group_labels[g] for g in base_selectable],
+            default=[group_labels[g] for g in base_selectable],
+            selection_mode="multi",
+            label_visibility="collapsed",
+        )
+        selected_base_groups = fixed_groups | {g for g in base_selectable if group_labels[g] in base_sel}
+    else:
+        selected_base_groups = fixed_groups | set(base_avail)
+
+    selected_compare_groups = {}
+    for cname in compare_lists:
+        cmp_avail = detect_lang_groups(data_dict[cname].columns)
+        cmp_selectable = [g for g in cmp_avail if g not in fixed_groups]
+        if cmp_selectable:
+            st.caption(f"▸ {cname}")
+            cmp_sel = st.pills(
+                f"cmp_{cname}",
+                options=[group_labels[g] for g in cmp_selectable],
+                default=[group_labels[g] for g in cmp_selectable],
+                selection_mode="multi",
+                label_visibility="collapsed",
+            )
+            selected_compare_groups[cname] = fixed_groups | {g for g in cmp_selectable if group_labels[g] in cmp_sel}
+        else:
+            selected_compare_groups[cname] = fixed_groups | set(cmp_avail)
+
 # ==========================================
 # 4. 核心合併
 # ==========================================
@@ -493,7 +584,8 @@ for p_col in priority_basic_cols:
 for c in all_cols:
     if c not in final_col_order: final_col_order.append(c)
 
-main_df = main_df[final_col_order]
+filtered_col_order = filter_cols_by_groups(final_col_order, selected_base_groups, selected_compare_groups)
+main_df = main_df[filtered_col_order]
 display_df = translate_columns(main_df, lang_code)
 
 # 推斷各字段對應的 display_df 列名（翻譯後）
