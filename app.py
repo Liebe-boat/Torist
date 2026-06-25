@@ -11,6 +11,8 @@ st.set_page_config(page_title="Torist Bird Index", layout="wide", page_icon="�
 
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Serif+SC&family=Noto+Serif+TC&display=swap');
+
 /* multiselect 已選標籤背景色 */
 span[data-baseweb="tag"] {
     background-color: rgb(211, 186, 227) !important;
@@ -19,12 +21,30 @@ span[data-baseweb="tag"] {
 span[data-baseweb="tag"] span {
     color: #2d2d2d !important;
 }
+/* 主標題 */
+.torist-title {
+    font-family: 'Noto Serif JP', 'Noto Serif SC', 'Noto Serif TC', serif;
+    font-size: 2.6rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.1rem;
+}
+/* 副標題 */
+.torist-subtitle {
+    font-family: 'Noto Serif JP', 'Noto Serif SC', 'Noto Serif TC', serif;
+    font-size: 1.05rem;
+    font-weight: 400;
+    color: #888;
+    margin-top: 0;
+    letter-spacing: 0.04em;
+}
 </style>
 """, unsafe_allow_html=True)
 
 TRANSLATIONS = {
     "SC": { # 簡體中文
-        "title": "Torist 🐦 多语言鸟类索引",
+        "title": "Torist - Tori のList",
+        "subtitle": "多语种鸟类名录",
         "settings": "系统设置",
         "data_status": "已加载版本",
         "base_list": "选择基准名录 (Base)",
@@ -52,7 +72,8 @@ TRANSLATIONS = {
         "showing_all": "共 {count} 条记录"
     },
     "TC": { # 繁體中文
-        "title": "Torist 🐦 多語言鳥類索引",
+        "title": "Torist - Tori のList",
+        "subtitle": "多語種鳥類名錄",
         "settings": "系統設置",
         "data_status": "已加載版本",
         "base_list": "選擇基準名錄 (Base)",
@@ -80,7 +101,8 @@ TRANSLATIONS = {
         "showing_all": "共 {count} 筆記錄"
     },
     "EN": {
-        "title": "Torist 🐦 Smart Wild Bird Index",
+        "title": "Torist - Tori のList",
+        "subtitle": "Multilingual Bird Checklist",
         "settings": "System Settings",
         "data_status": "Loaded Versions",
         "base_list": "Base Checklist",
@@ -108,7 +130,8 @@ TRANSLATIONS = {
         "showing_all": "{count} records total"
     },
     "JP": {
-        "title": "Torist 🐦 多語言野鳥名錄",
+        "title": "Torist - Tori のList",
+        "subtitle": "多言語鳥類名録",
         "settings": "設定",
         "data_status": "読込済みリスト",
         "base_list": "基準リスト (Base)",
@@ -480,7 +503,12 @@ with st.sidebar:
     
     txt = TRANSLATIONS[lang_code]
 
-st.title(txt["title"])
+st.markdown(f"""
+<div>
+  <div class="torist-title">{txt["title"]}</div>
+  <div class="torist-subtitle">{txt["subtitle"]}</div>
+</div>
+""", unsafe_allow_html=True)
 
 data_dict, synonym_map, status = load_data()
 
