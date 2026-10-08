@@ -602,17 +602,22 @@ for target_name in compare_lists:
         left_on='Link_Key', right_on='学名',
         how='left'
     )
+    # 先在 merged_matched 里统一列名，再 concat
+    if '学名_y' in merged_matched.columns:
+        merged_matched = merged_matched.drop(columns=['学名_y'])
+    if '学名_x' in merged_matched.columns:
+        merged_matched = merged_matched.rename(columns={'学名_x': '学名'})
+    if 'Link_Key' in merged_matched.columns:
+        merged_matched = merged_matched.drop(columns=['Link_Key'])
 
     no_key = main_df[~has_key].copy()
+    if 'Link_Key' in no_key.columns:
+        no_key = no_key.drop(columns=['Link_Key'])
     for col in rename_map.values():
-        no_key[col] = pd.NA
+        if col not in no_key.columns:
+            no_key[col] = pd.NA
 
-    merged = pd.concat([merged_matched, no_key], ignore_index=True)
-
-    if 'Link_Key' in merged.columns: del merged['Link_Key']
-    if '学名_y' in merged.columns: del merged['学名_y']
-    if '学名_x' in merged.columns: merged = merged.rename(columns={'学名_x': '学名'})
-    main_df = merged
+    main_df = pd.concat([merged_matched, no_key], ignore_index=True)
 
 # ==========================================
 # 5. 顯示優化
