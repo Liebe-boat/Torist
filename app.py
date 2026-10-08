@@ -8,9 +8,19 @@ import opencc
 _s2t = opencc.OpenCC('s2t')
 _t2s = opencc.OpenCC('t2s')
 
+def _hira_to_kata(s: str) -> str:
+    return ''.join(chr(ord(c) + 0x60) if 'ぁ' <= c <= 'ん' else c for c in s)
+
+def _kata_to_hira(s: str) -> str:
+    return ''.join(chr(ord(c) - 0x60) if 'ァ' <= c <= 'ン' else c for c in s)
+
 def get_query_variants(q: str) -> list[str]:
-    """返回查询词的简体/繁体变体列表（去重）"""
-    variants = {q, _s2t.convert(q), _t2s.convert(q)}
+    """返回查询词的所有变体：简繁转换 + 平片假名互转（去重）"""
+    base = {q, _s2t.convert(q), _t2s.convert(q)}
+    variants = set(base)
+    for v in base:
+        variants.add(_hira_to_kata(v))
+        variants.add(_kata_to_hira(v))
     return list(variants)
 
 # ==========================================
