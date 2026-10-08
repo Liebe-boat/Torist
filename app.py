@@ -3,6 +3,15 @@ import pandas as pd
 import os
 import re
 from rapidfuzz import fuzz
+import opencc
+
+_s2t = opencc.OpenCC('s2t')
+_t2s = opencc.OpenCC('t2s')
+
+def get_query_variants(q: str) -> list[str]:
+    """返回查询词的简体/繁体变体列表（去重）"""
+    variants = {q, _s2t.convert(q), _t2s.convert(q)}
+    return list(variants)
 
 # ==========================================
 # 0. 多語言配置 & 列名翻譯字典
@@ -668,23 +677,31 @@ col_cfg = {index_label: st.column_config.TextColumn(width="small")} if index_lab
 # 搜索邏輯
 if query:
     search_cols = get_scope_cols(scope, main_df, display_df, lang_code)
-    q_lower = query.lower()
+    q_variants = get_query_variants(query)
 
     if mode == "startswith":
-        mask = display_df[search_cols].astype(str).apply(
-            lambda x: x.str.lower().str.startswith(q_lower)
-        ).any(axis=1)
+        mask = pd.Series(False, index=display_df.index)
+        for v in q_variants:
+            v_lower = v.lower()
+            mask |= display_df[search_cols].astype(str).apply(
+                lambda x: x.str.lower().str.startswith(v_lower)
+            ).any(axis=1)
     elif mode == "fuzzy":
         def row_fuzzy_match(row):
             for val in row:
-                if fuzz.partial_ratio(q_lower, str(val).lower()) >= fuzzy_threshold:
-                    return True
+                cell = str(val).lower()
+                for v in q_variants:
+                    if fuzz.partial_ratio(v.lower(), cell) >= fuzzy_threshold:
+                        return True
             return False
         mask = display_df[search_cols].apply(row_fuzzy_match, axis=1)
     else:
-        mask = display_df[search_cols].astype(str).apply(
-            lambda x: x.str.lower().str.contains(q_lower, regex=False)
-        ).any(axis=1)
+        mask = pd.Series(False, index=display_df.index)
+        for v in q_variants:
+            v_lower = v.lower()
+            mask |= display_df[search_cols].astype(str).apply(
+                lambda x: x.str.lower().str.contains(v_lower, regex=False)
+            ).any(axis=1)
 
     res = display_df[mask]
     col_info, col_export = st.columns([3, 1])
