@@ -594,14 +594,21 @@ for target_name in compare_lists:
     target_df_renamed = target_df.rename(columns=rename_map)
     cols_to_use = ['学名'] + list(rename_map.values())
     
-    merged = pd.merge(
-        main_df,
-        target_df_renamed[cols_to_use], 
-        left_on='Link_Key',
-        right_on='学名',
+    has_key = main_df['Link_Key'].notna()
+
+    merged_matched = pd.merge(
+        main_df[has_key],
+        target_df_renamed[cols_to_use],
+        left_on='Link_Key', right_on='学名',
         how='left'
     )
-    
+
+    no_key = main_df[~has_key].copy()
+    for col in rename_map.values():
+        no_key[col] = pd.NA
+
+    merged = pd.concat([merged_matched, no_key], ignore_index=True)
+
     if 'Link_Key' in merged.columns: del merged['Link_Key']
     if '学名_y' in merged.columns: del merged['学名_y']
     if '学名_x' in merged.columns: merged = merged.rename(columns={'学名_x': '学名'})
