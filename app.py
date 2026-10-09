@@ -68,6 +68,11 @@ span[data-baseweb="tag"] span {
 [data-testid="stSidebar"] hr {
     border-color: #D6D3CB !important;
 }
+
+/* 表格水平滾動條不遮擋最後一行 */
+[data-testid="stDataFrame"] > div {
+    padding-bottom: 8px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -515,6 +520,19 @@ def load_data():
                     df['学名'] = df['学名'].str.strip()
                     if 'Index' in df.columns:
                         df['Index'] = df['Index'].apply(clean_index)
+
+                    # IOC 14.2 源文件勘误：Ardea intermedia 与 Syrigma sibilatrix
+                    # 的繁体中文名互换，手动纠正
+                    tc_col = 'Chinese (Traditional)'
+                    if '14.2' in version and tc_col in df.columns:
+                        df = df.set_index('学名', drop=False)
+                        if 'Ardea intermedia' in df.index and 'Syrigma sibilatrix' in df.index:
+                            ai_tc = df.at['Ardea intermedia', tc_col]
+                            ss_tc = df.at['Syrigma sibilatrix', tc_col]
+                            df.at['Ardea intermedia', tc_col] = ss_tc
+                            df.at['Syrigma sibilatrix', tc_col] = ai_tc
+                        df = df.reset_index(drop=True)
+
                     data_store[f"IOC ({version})"] = df
 
     print("🚀 数据加载完成！")
@@ -554,10 +572,6 @@ if synonym_map:
 with st.sidebar:
     st.markdown("---")
     st.header(txt["settings"])
-    with st.expander(txt["data_status"]):
-        for k in sorted(data_dict.keys()):
-            st.success(f"✅ {k}")
-            
     def checklist_sort_key(name):
         m = re.search(r'IOC.*?(\d+)\.(\d+)', name)
         if m:
