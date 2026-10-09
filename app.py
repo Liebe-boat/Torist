@@ -32,30 +32,41 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Serif+SC&family=Noto+Serif+TC&display=swap');
 
-/* multiselect 已選標籤背景色 */
+/* multiselect 已選標籤 */
 span[data-baseweb="tag"] {
-    background-color: rgb(211, 186, 227) !important;
+    background-color: rgb(242, 210, 178) !important;
 }
-/* 標籤文字顏色（深色確保可讀） */
 span[data-baseweb="tag"] span {
-    color: #2d2d2d !important;
+    color: #6B3A10 !important;
 }
+
 /* 主標題 */
 .torist-title {
-    font-family: 'Noto Serif JP', 'Noto Serif SC', 'Noto Serif TC', serif;
+    font-family: 'Noto Serif JP', 'Noto Serif SC', 'Noto Serif TC', Georgia, serif;
     font-size: 2.6rem;
     font-weight: 700;
     line-height: 1.2;
     margin-bottom: 0.1rem;
+    color: #1B1B18;
 }
 /* 副標題 */
 .torist-subtitle {
-    font-family: 'Noto Serif JP', 'Noto Serif SC', 'Noto Serif TC', serif;
+    font-family: 'Noto Serif JP', 'Noto Serif SC', 'Noto Serif TC', Georgia, serif;
     font-size: 1.05rem;
     font-weight: 400;
-    color: #888;
+    color: #9B5E2A;
     margin-top: 0;
     letter-spacing: 0.04em;
+}
+
+/* 表格行 hover 暖色 */
+[data-testid="stDataFrame"] tr:hover td {
+    background-color: #F5EDE4 !important;
+}
+
+/* 側邊欄分隔線顏色 */
+[data-testid="stSidebar"] hr {
+    border-color: #D6D3CB !important;
 }
 </style>
 """, unsafe_allow_html=True)
