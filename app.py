@@ -561,8 +561,8 @@ with st.sidebar:
     def checklist_sort_key(name):
         m = re.search(r'IOC.*?(\d+)\.(\d+)', name)
         if m:
-            return (0, -int(m.group(1)), -int(m.group(2)))
-        return (1, 0, 0)
+            return (0, -int(m.group(1)), -int(m.group(2)), '')
+        return (1, 0, 0, name)
 
     sorted_keys = sorted(data_dict.keys(), key=checklist_sort_key)
     default_idx = next((i for i, k in enumerate(sorted_keys) if "IOC" in k), 0)
