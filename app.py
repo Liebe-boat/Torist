@@ -68,11 +68,6 @@ span[data-baseweb="tag"] span {
 [data-testid="stSidebar"] hr {
     border-color: #D6D3CB !important;
 }
-
-/* 表格水平滾動條不遮擋最後一行 */
-[data-testid="stDataFrame"] > div {
-    padding-bottom: 8px !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -729,6 +724,11 @@ if mode == "fuzzy":
 index_label = get_col_label('Index', lang_code)
 col_cfg = {index_label: st.column_config.TextColumn(width="small")} if index_label in display_df.columns else {}
 
+def df_height(df, max_h=620):
+    """行数 × 行高 + 表头 + 横向滚动条，避免滚动条覆盖末行"""
+    ROW_H, HEADER_H, SCROLLBAR_H = 35, 38, 16
+    return min(HEADER_H + ROW_H * len(df) + SCROLLBAR_H, max_h)
+
 # 搜索邏輯
 if query:
     search_cols = get_scope_cols(scope, main_df, display_df, lang_code)
@@ -769,7 +769,7 @@ if query:
             file_name="torist_search.csv",
             mime="text/csv",
         )
-    st.dataframe(res, use_container_width=True, hide_index=True, column_config=col_cfg)
+    st.dataframe(res, use_container_width=True, hide_index=True, column_config=col_cfg, height=df_height(res))
 else:
     col_info, col_export = st.columns([3, 1])
     with col_info:
@@ -781,4 +781,4 @@ else:
             file_name="torist_full.csv",
             mime="text/csv",
         )
-    st.dataframe(display_df, use_container_width=True, hide_index=True, column_config=col_cfg)
+    st.dataframe(display_df, use_container_width=True, hide_index=True, column_config=col_cfg, height=df_height(display_df))
