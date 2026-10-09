@@ -558,7 +558,15 @@ with st.sidebar:
         for k in sorted(data_dict.keys()):
             st.success(f"✅ {k}")
             
-    base_list = st.selectbox(txt["base_list"], sorted(data_dict.keys()))
+    def checklist_sort_key(name):
+        m = re.search(r'IOC.*?(\d+)\.(\d+)', name)
+        if m:
+            return (0, -int(m.group(1)), -int(m.group(2)))
+        return (1, 0, 0)
+
+    sorted_keys = sorted(data_dict.keys(), key=checklist_sort_key)
+    default_idx = next((i for i, k in enumerate(sorted_keys) if "IOC" in k), 0)
+    base_list = st.selectbox(txt["base_list"], sorted_keys, index=default_idx)
     
     avail_opts = sorted([k for k in data_dict.keys() if k != base_list])
     default_vals = []
