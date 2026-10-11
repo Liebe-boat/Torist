@@ -691,6 +691,7 @@ base_cn_col = next(
     None
 )
 if base_cn_col:
+    any_diff = pd.Series(False, index=main_df.index)
     for col in main_df.columns:
         # 只处理对比列（含 [...]，且来源是 IOC 或 CBR，不含 Taiwan）
         if '[' not in col or not col.endswith(']'):
@@ -713,6 +714,11 @@ if base_cn_col:
             (base_s.map(_norm_cn) != cmp_s.map(_norm_cn))
         )
         main_df.loc[valid, col] = cmp_s[valid] + '  ※'
+        any_diff |= valid
+
+    # 编号列同步标记
+    if 'Index' in main_df.columns and any_diff.any():
+        main_df.loc[any_diff, 'Index'] = main_df.loc[any_diff, 'Index'].astype(str) + ' ※'
 
 display_df = translate_columns(main_df, lang_code)
 
