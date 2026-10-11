@@ -669,6 +669,23 @@ for c in all_cols:
 
 filtered_col_order = filter_cols_by_selection(final_col_order, selected_base_cols, selected_compare_cols)
 main_df = main_df[filtered_col_order]
+
+# 同种异名提示：学名相同但中文名不同 → 对比列中文名加 ※
+# 在翻译前操作原始列名，避免跨语言列名歧义
+base_cn = '中文名'
+if base_cn in main_df.columns:
+    for col in main_df.columns:
+        # 只处理 IOC 对比列里的简体中文列（Chinese [IOC (...)]）
+        if col.startswith('Chinese [') and col.endswith(']'):
+            valid = (
+                main_df[base_cn].notna() &
+                main_df[col].notna() &
+                (main_df[col].astype(str) != 'None') &
+                (main_df[col].astype(str) != '') &
+                (main_df[base_cn].astype(str) != main_df[col].astype(str))
+            )
+            main_df.loc[valid, col] = main_df.loc[valid, col].astype(str) + '  ※'
+
 display_df = translate_columns(main_df, lang_code)
 
 # 推斷各字段對應的 display_df 列名（翻譯後）
@@ -782,3 +799,5 @@ else:
             mime="text/csv",
         )
     st.dataframe(display_df, use_container_width=True, hide_index=True, column_config=col_cfg, height=df_height(display_df))
+
+st.caption("※ 同一物种在不同名录中使用了不同的中文名")
