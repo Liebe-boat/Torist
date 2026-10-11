@@ -670,21 +670,49 @@ for c in all_cols:
 filtered_col_order = filter_cols_by_selection(final_col_order, selected_base_cols, selected_compare_cols)
 main_df = main_df[filtered_col_order]
 
-# 同种异名提示：学名相同但中文名不同 → 对比列中文名加 ※
+# 同种异名提示：IOC ↔ CBR 简体中文名不同 → 对比列加 ※（双向，排除 Taiwan）
 # 在翻译前操作原始列名，避免跨语言列名歧义
-base_cn = '中文名'
-if base_cn in main_df.columns:
+def _is_ioc_cbr_cn_col(col):
+    """判断列是否为 IOC 或 CBR 的简体中文列（排除 Taiwan 的 中文名_TW）"""
+    base = col.split(' [')[0] if ' [' in col else col
+    source = col[col.rindex('[')+1:-1] if '[' in col else ''
+    is_cn = base in ('中文名', 'Chinese')
+    is_ioc_or_cbr = 'IOC' in source or 'CBR' in source or source == ''
+    is_not_tw = base != '中文名_TW'
+    return is_cn and is_ioc_or_cbr and is_not_tw
+
+def _norm_cn(s):
+    """简繁归一（转为简体）用于比较"""
+    return _t2s.convert(str(s))
+
+# 找基准中文列（不含 [...]，且是 IOC/CBR 简体）
+base_cn_col = next(
+    (c for c in main_df.columns if _is_ioc_cbr_cn_col(c) and '[' not in c),
+    None
+)
+if base_cn_col:
     for col in main_df.columns:
-        # 只处理 IOC 对比列里的简体中文列（Chinese [IOC (...)]）
-        if col.startswith('Chinese [') and col.endswith(']'):
-            valid = (
-                main_df[base_cn].notna() &
-                main_df[col].notna() &
-                (main_df[col].astype(str) != 'None') &
-                (main_df[col].astype(str) != '') &
-                (main_df[base_cn].astype(str) != main_df[col].astype(str))
-            )
-            main_df.loc[valid, col] = main_df.loc[valid, col].astype(str) + '  ※'
+        # 只处理对比列（含 [...]，且来源是 IOC 或 CBR，不含 Taiwan）
+        if '[' not in col or not col.endswith(']'):
+            continue
+        source = col[col.rindex('[')+1:-1]
+        if not ('IOC' in source or 'CBR' in source):
+            continue
+        base_part = col.split(' [')[0]
+        if base_part not in ('中文名', 'Chinese'):
+            continue
+
+        base_s = main_df[base_cn_col].astype(str)
+        cmp_s = main_df[col].astype(str)
+        valid = (
+            main_df[base_cn_col].notna() &
+            main_df[col].notna() &
+            (cmp_s != 'None') &
+            (cmp_s != '') &
+            (cmp_s != 'nan') &
+            (base_s.map(_norm_cn) != cmp_s.map(_norm_cn))
+        )
+        main_df.loc[valid, col] = cmp_s[valid] + '  ※'
 
 display_df = translate_columns(main_df, lang_code)
 
